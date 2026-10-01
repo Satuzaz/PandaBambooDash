@@ -1,0 +1,50 @@
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public abstract class Level {
+    private final int number;
+    private final String name;
+    private final BufferedImage background;
+    private final List<Platform> platforms = new ArrayList<>();
+    private final List<Enemy> enemies = new ArrayList<>();
+    private final List<Item> items = new ArrayList<>();
+    private final List<Entity> entities = new ArrayList<>();
+    protected final Assets assets;
+    protected Level(int number, String name, Assets assets) {
+        this.number = number; this.name = name; this.assets = assets;
+        background = assets.get("background/level" + number + ".png");
+    }
+    protected final void platform(int x, int y, int width, int height) {
+        Platform p = new Platform(x,y,width,height, number == 3 ? new Color(77,158,167) : new Color(124,173,73));
+        platforms.add(p); entities.add(p);
+    }
+    protected final void bamboo(int x, int y) {
+        Item item = new Bamboo(x,y,assets); items.add(item); entities.add(item);
+    }
+    protected final void snake(int x, int y, int left, int right, double speed) {
+        Enemy enemy = new Enemy(x,y,left,right,speed,assets); enemies.add(enemy); entities.add(enemy);
+    }
+    public final int getNumber() { return number; }
+    public final String getName() { return name; }
+    public final List<Platform> getPlatforms() { return Collections.unmodifiableList(platforms); }
+    public final List<Item> getItems() { return Collections.unmodifiableList(items); }
+    public final List<Enemy> getEnemies() { return Collections.unmodifiableList(enemies); }
+    public final void update(double dt, Player player) {
+        for (Entity entity : entities) entity.update(dt);
+        for (Enemy enemy : enemies) enemy.checkCollision(player);
+        for (Item item : items) if (!item.isCollected() && item.collidesWith(player)) item.collect(player);
+    }
+    public final void draw(Graphics2D g) {
+        g.drawImage(background,0,0,800,600,null);
+        g.setColor(new Color(6,20,19,45)); g.fillRect(0,0,800,600);
+        if (number == 3) {
+            g.setColor(new Color(216,93,69));
+            for (int x = 230; x < 330; x += 20) g.fillPolygon(new int[]{x,x+10,x+20},new int[]{599,578,599},3);
+            for (int x = 510; x < 620; x += 20) g.fillPolygon(new int[]{x,x+10,x+20},new int[]{599,578,599},3);
+        }
+        for (Entity entity : entities) entity.draw(g);
+    }
+}

@@ -1,0 +1,45 @@
+import java.awt.Graphics2D;
+import java.util.List;
+
+public final class Player extends Entity {
+    private double velocityX, velocityY;
+    private final double speed = 245;
+    private int hearts = 3, bamboo;
+    private boolean grounded;
+    private double invulnerability;
+    private List<Platform> platforms = java.util.Collections.emptyList();
+
+    public Player(Assets assets) { super(40, 482, 40, 48, assets.get("player/panda.png")); }
+    public int getHearts() { return hearts; }
+    public int getBamboo() { return bamboo; }
+    public boolean isGrounded() { return grounded; }
+    public void move(int direction) { velocityX = Math.max(-1, Math.min(1, direction)) * speed; }
+    public void jump() { if (grounded) { velocityY = -610; grounded = false; } }
+    public void collectBamboo() { bamboo++; }
+    public void enterLevel(Level level) { platforms = level.getPlatforms(); bamboo = 0; respawn(); }
+    private void respawn() { setX(40); setY(482); velocityX = 0; velocityY = 0; grounded = false; }
+    public void takeDamage() {
+        if (invulnerability <= 0 && hearts > 0) { hearts--; invulnerability = 1.4; }
+    }
+    @Override public void update(double dt) {
+        invulnerability = Math.max(0, invulnerability - dt);
+        setX(getX() + velocityX * dt);
+        for (Platform p : platforms) if (collidesWith(p)) {
+            if (velocityX > 0) setX(p.getX() - getWidth());
+            else if (velocityX < 0) setX(p.getX() + p.getWidth());
+        }
+        setX(Math.max(0, Math.min(800 - getWidth(), getX())));
+        velocityY = Math.min(900, velocityY + 1600 * dt);
+        setY(getY() + velocityY * dt);
+        grounded = false;
+        for (Platform p : platforms) if (collidesWith(p)) {
+            if (velocityY > 0) { setY(p.getY() - getHeight()); grounded = true; }
+            else if (velocityY < 0) setY(p.getY() + p.getHeight());
+            velocityY = 0;
+        }
+        if (getY() > 600) { takeDamage(); respawn(); }
+    }
+    @Override public void draw(Graphics2D g) {
+        if (invulnerability <= 0 || ((int)(invulnerability * 12) % 2 == 0)) super.draw(g);
+    }
+}
