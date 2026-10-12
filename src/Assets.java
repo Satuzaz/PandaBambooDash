@@ -1,61 +1,125 @@
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Image;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
-import java.nio.file.*;
-import java.util.*;
 import javax.imageio.ImageIO;
 
-public final class Assets {
-    private final Map<String, BufferedImage> images = new HashMap<>();
-    private final Path root;
+// โหลดรูปครั้งเดียว แล้วเก็บไว้ในตัวแปรที่เรียกใช้ได้โดยตรง
+public class Assets {
+    public BufferedImage bamboo;
+    public BufferedImage logo;
+    public BufferedImage heartFull;
+    public BufferedImage heartEmpty;
+    public BufferedImage[] backgrounds = new BufferedImage[3];
+    public BufferedImage[] pandaIdle;
+    public BufferedImage[] pandaWalk;
+    public BufferedImage[] pandaJump;
+    public BufferedImage[] snakeIdle;
+    public BufferedImage[] snakeMove;
+    private File folder;
 
-    public Assets() throws Exception {
-        Path found = findRoot(Paths.get("").toAbsolutePath());
-        if (found == null) {
-            found = findRoot(Paths.get(Assets.class.getProtectionDomain().getCodeSource().getLocation().toURI()));
+    public Assets() throws IOException {
+        folder = findFolder();
+        bamboo = load("item/bamboo.png");
+        logo = load("ui/logo.png");
+        heartFull = load("ui/heart_full.png");
+        heartEmpty = load("ui/heart_empty.png");
+        for (int i = 0; i < 3; i++) {
+            backgrounds[i] = load("background/level" + (i + 1) + ".png");
         }
-        if (found == null) throw new IOException("Cannot find assets directory. Keep assets beside src and run from the project folder.");
-        root = found;
-        for (String path : new String[]{"player/panda.png", "enemy/snake.png", "item/bamboo.png",
-                "background/level1.png", "background/level2.png", "background/level3.png",
-                "ui/logo.png", "ui/heart_full.png", "ui/heart_empty.png",
-                "ui/button_start.png", "ui/button_retry.png", "ui/button_menu.png",
-                "ui/button_howtoplay.png", "ui/button_exit.png", "ui/button_next.png",
-                "player/animation/idle.png", "player/animation/walk.png", "player/animation/jump.png",
-                "enemy/animation/idle.png", "enemy/animation/move.png"}) {
-            BufferedImage image = ImageIO.read(root.resolve(path).toFile());
-            if (image == null) throw new IOException("Invalid PNG: " + path);
-            images.put(path, image);
-        }
-        // Named frame images share the existing PNG sheets; originals remain untouched.
-        BufferedImage[] idle = frames("enemy/animation/idle.png",4);
-        BufferedImage[] move = frames("enemy/animation/move.png",4);
-        images.put("snake_idle_1",idle[0]); images.put("snake_idle_2",idle[1]);
-        images.put("snake_move_1",move[0]); images.put("snake_move_2",move[2]);
+        pandaIdle = loadFrames("player/animation/idle.png", 48, 64);
+        pandaWalk = loadFrames("player/animation/walk.png", 48, 64);
+        pandaJump = loadFrames("player/animation/jump.png", 48, 64);
+        snakeIdle = loadFrames("enemy/animation/idle.png", 80, 72);
+        snakeMove = loadFrames("enemy/animation/move.png", 80, 72);
     }
 
-    private Path findRoot(Path from) {
-        for (Path p = from; p != null; p = p.getParent()) {
-            if (Files.isDirectory(p.resolve("assets"))) return p.resolve("assets");
+    private BufferedImage load(String name) throws IOException {
+        File file = new File(folder, name);
+        if (!file.isFile()) {
+            throw new IOException("Missing image: " + file.getAbsolutePath());
+        }
+        BufferedImage image = ImageIO.read(file);
+        if (image == null) {
+            throw new IOException("Invalid image: " + file.getAbsolutePath());
+        }
+        return image;
+    }
+
+    // หา assets จากโฟลเดอร์ที่รันก่อน แล้วลองหาจากตำแหน่งไฟล์คลาส
+    // เก็บส่วนนี้ไว้เพื่อให้เปิดเกมจาก IDE หรือต่างโฟลเดอร์ได้
+    private File findFolder() throws IOException {
+        File result = searchParents(new File(System.getProperty("user.dir")));
+        if (result != null) {
+            return result;
+        }
+        try {
+            File classFolder = new File(Assets.class.getProtectionDomain()
+                    .getCodeSource().getLocation().toURI());
+            result = searchParents(classFolder);
+        } catch (java.net.URISyntaxException e) {
+            throw new IOException("Cannot locate game folder", e);
+        }
+        if (result == null) {
+            throw new IOException("Cannot find assets. Keep assets beside src.");
+        }
+        return result;
+    }
+
+    private File searchParents(File start) {
+        while (start != null) {
+            File candidate = new File(start, "assets");
+            if (candidate.isDirectory()) {
+                return candidate;
+            }
+            start = start.getParentFile();
         }
         return null;
     }
 
-    public BufferedImage get(String path) {
-        BufferedImage image = images.get(path);
-        if (image == null) throw new IllegalArgumentException("Unknown asset: " + path);
-        return image;
+    private BufferedImage[] loadFrames(String name, int width, int height) throws IOException {
+        BufferedImage sheet = load(name);
+        BufferedImage[] pictures = new BufferedImage[4];
+        int cellWidth = sheet.getWidth() / 4;
+
+        // หาขอบล่างของรูป ไม่เอาพื้นที่โปร่งใสใต้เท้า
+        int bottom = 0;
+        for (int y = 0; y < sheet.getHeight(); y++) {
+            for (int x = 0; x < sheet.getWidth(); x++) {
+                Color pixel = new Color(sheet.getRGB(x, y), true);
+                if (pixel.getAlpha() > 32) {
+                    bottom = y;
+                    break;
+                }
+            }
+        }
+        for (int i = 0; i < 4; i++) {
+            BufferedImage picture = sheet.getSubimage(i * cellWidth, 0, cellWidth, bottom + 1);
+            pictures[i] = fit(picture, GamePanel.screenX(width), GamePanel.screenY(height));
+        }
+        return pictures;
     }
 
-    /** Split equal horizontal cells once at construction; no image IO inside the game loop. */
-    public BufferedImage[] frames(String path, int count) {
-        BufferedImage sheet = get(path);
-        if (count <= 0 || sheet.getWidth() < count) throw new IllegalArgumentException("Invalid frame count");
-        BufferedImage[] frames = new BufferedImage[count];
-        for (int i = 0; i < count; i++) {
-            int start = i * sheet.getWidth() / count;
-            int end = (i + 1) * sheet.getWidth() / count;
-            frames[i] = sheet.getSubimage(start,0,end-start,sheet.getHeight());
+    // ย่อรูปตอนโหลด เพื่อไม่ต้องย่อซ้ำทุกครั้งที่วาด
+    public static BufferedImage resize(BufferedImage image, int width, int height) {
+        Image scaled = image.getScaledInstance(width, height, Image.SCALE_SMOOTH);
+        BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics g = result.getGraphics();
+        g.drawImage(scaled, 0, 0, null);
+        g.dispose();
+        return result;
+    }
+
+    public static BufferedImage fit(BufferedImage image, int width, int height) {
+        double scale = (double) width / image.getWidth();
+        double heightScale = (double) height / image.getHeight();
+        if (heightScale < scale) {
+            scale = heightScale;
         }
-        return frames;
+        int newWidth = Math.max(1, (int) (image.getWidth() * scale));
+        int newHeight = Math.max(1, (int) (image.getHeight() * scale));
+        return resize(image, newWidth, newHeight);
     }
 }

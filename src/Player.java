@@ -1,57 +1,160 @@
-import java.awt.Graphics2D;
-import java.util.List;
+import java.awt.Graphics;
+import java.util.ArrayList;
 
-public final class Player extends Entity {
-    private final AnimationController animation = new AnimationController();
+
+public class Player extends Entity {
+    private double velocityX;
+    private double velocityY;
+    private double speed = 245;
+    public static final int MAX_HEARTS = 4;
+    private int hearts = MAX_HEARTS;
+    private Animation idle;
+    private Animation walk;
+    private Animation jump;
+    private Animation animation;
     private boolean facingLeft;
-    private double velocityX, velocityY;
-    private final double speed = 245;
-    private int hearts = 3, bamboo;
+    private int bamboo;
     private boolean grounded;
-    private double invulnerability;
-    private List<Platform> platforms = java.util.Collections.emptyList();
+    private double damageCooldown;
+    private double blinkTimer;
+    private boolean hidden;
+    private ArrayList<Platform> platforms = new ArrayList<>();
 
     public Player(Assets assets) {
-        super(40, 482, 40, 48, assets.get("player/panda.png"));
-        animation.add("idle", assets.frames("player/animation/idle.png",4),5,true);
-        animation.add("walk", assets.frames("player/animation/walk.png",4),10,true);
-        animation.add("jump", assets.frames("player/animation/jump.png",4),9,false);
-        animation.play("idle");
+        super(40, 482, 40, 48, null);
+        idle = new Animation(assets.pandaIdle, 0.20, true);
+        walk = new Animation(assets.pandaWalk, 0.12, true);
+        jump = new Animation(assets.pandaJump, 0.12, false);
+        animation = idle;
     }
-    public int getHearts() { return hearts; }
-    public int getBamboo() { return bamboo; }
-    public boolean isGrounded() { return grounded; }
-    public void move(int direction) { velocityX = Math.max(-1, Math.min(1, direction)) * speed; }
-    public void jump() { if (grounded) { velocityY = -610; grounded = false; } }
-    public void collectBamboo() { bamboo++; }
-    public void enterLevel(Level level) { platforms = level.getPlatforms(); bamboo = 0; respawn(); }
-    private void respawn() { setX(40); setY(482); velocityX = 0; velocityY = 0; grounded = false; }
-    public void takeDamage() {
-        if (invulnerability <= 0 && hearts > 0) { hearts--; invulnerability = 1.4; }
+
+    public int getHearts() {
+        return hearts;
     }
-    @Override public void update(double dt) {
-        invulnerability = Math.max(0, invulnerability - dt);
-        setX(getX() + velocityX * dt);
-        for (Platform p : platforms) if (collidesWith(p)) {
-            if (velocityX > 0) setX(p.getX() - getWidth());
-            else if (velocityX < 0) setX(p.getX() + p.getWidth());
+
+    public int getBamboo() {
+        return bamboo;
+    }
+
+    public boolean isGrounded() {
+        return grounded;
+    }
+
+    public void move(int direction) {
+        velocityX = direction * speed;
+        if (direction != 0) {
+            facingLeft = direction < 0;
         }
-        setX(Math.max(0, Math.min(800 - getWidth(), getX())));
-        velocityY = Math.min(900, velocityY + 1600 * dt);
-        setY(getY() + velocityY * dt);
+    }
+
+    public void jump() {
+        if (grounded) {
+            velocityY = -610;
+            grounded = false;
+        }
+    }
+
+    public void collectBamboo() {
+        bamboo++;
+    }
+
+    public void enterLevel(Level level) {
+        platforms = level.getPlatforms();
+        bamboo = 0;
+        respawn();
+    }
+
+    private void respawn() {
+        x = 40;
+        y = 482;
+        velocityX = 0;
+        velocityY = 0;
         grounded = false;
-        for (Platform p : platforms) if (collidesWith(p)) {
-            if (velocityY > 0) { setY(p.getY() - getHeight()); grounded = true; }
-            else if (velocityY < 0) setY(p.getY() + p.getHeight());
-            velocityY = 0;
+    }
+
+    public void takeDamage() {
+        if (damageCooldown <= 0 && hearts > 0) {
+            hearts--;
+            damageCooldown = 1.4;
+            blinkTimer = 0;
+            hidden = false;
         }
-        if (getY() > 600) { takeDamage(); respawn(); }
-        if (velocityX != 0) facingLeft = velocityX < 0;
-        animation.play(!grounded ? "jump" : velocityX != 0 ? "walk" : "idle");
+    }
+
+    @Override
+    public void update(double dt) {
+        // หลังโดนชน ให้สลับแสดงและซ่อนตัวทุก 0.1 วินาที
+        if (damageCooldown > 0) {
+            damageCooldown = damageCooldown - dt;
+            blinkTimer = blinkTimer + dt;
+            if (blinkTimer >= 0.1) {
+                hidden = !hidden;
+                blinkTimer = 0;
+            }
+        }
+        if (damageCooldown <= 0) {
+            hidden = false;
+        }
+
+        // ขยับแนวนอน แล้วตรวจว่าชนด้านข้างของพื้นหรือไม่
+        x = x + velocityX * dt;
+        for (Platform platform : platforms) {
+            if (collidesWith(platform)) {
+                if (velocityX > 0) {
+                    x = platform.getX() - width;
+                } else if (velocityX < 0) {
+                    x = platform.getX() + platform.getWidth();
+                }
+            }
+        }
+        if (x < 0) {
+            x = 0;
+        }
+        if (x + width > 800) {
+            x = 800 - width;
+        }
+
+        // เพิ่มแรงตก แล้วตรวจว่าลงบนพื้นหรือชนเพดาน
+        velocityY = velocityY + 1600 * dt;
+        if (velocityY > 900) {
+            velocityY = 900;
+        }
+        y = y + velocityY * dt;
+        grounded = false;
+        for (Platform platform : platforms) {
+            if (collidesWith(platform)) {
+                if (velocityY > 0) {
+                    y = platform.getY() - height;
+                    grounded = true;
+                } else if (velocityY < 0) {
+                    y = platform.getY() + platform.getHeight();
+                }
+                velocityY = 0;
+            }
+        }
+        if (y > 600) {
+            takeDamage();
+            respawn();
+        }
+        Animation next = idle;
+        if (!grounded) {
+            next = jump;
+        } else if (velocityX != 0) {
+            next = walk;
+        }
+        if (animation != next) {
+            animation = next;
+            animation.reset();
+        }
         animation.update(dt);
     }
-    @Override public void draw(Graphics2D g) {
-        if (invulnerability <= 0 || ((int)(invulnerability * 12) % 2 == 0))
-            animation.draw(g,(int)getX(),(int)getY(),getWidth(),getHeight(),facingLeft);
+
+    @Override
+    public void draw(Graphics g) {
+        // ถ้าอยู่ในจังหวะซ่อนตัว ไม่ต้องวาดรูป
+        if (hidden) {
+            return;
+        }
+        drawFrame(g, animation.getFrame(), facingLeft);
     }
 }

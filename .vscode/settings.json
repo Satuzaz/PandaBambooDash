@@ -1,5 +1,0 @@
-{
-    "java.project.sourcePaths": ["src"],
-    "java.project.outputPath": "out/vscode",
-    "java.debug.settings.forceBuildBeforeLaunch": true
-}

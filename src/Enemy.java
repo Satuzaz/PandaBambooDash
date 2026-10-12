@@ -1,37 +1,49 @@
-public final class Enemy extends Entity {
-    private final AnimationController animation = new AnimationController();
-    private final double left, right, speed;
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
+
+public class Enemy extends Entity {
+    private int left;
+    private int right;
+    private double speed;
     private int direction = 1;
+    private Animation animation;
+
     public Enemy(int x, int y, int left, int right, double speed, Assets assets) {
-        // Enemy.draw renders the animated frame; no static snake image is assigned.
         super(x, y, 44, 30, null);
-        this.left = left; this.right = right; this.speed = speed * 0.75;
-        animation.add("idle",assets.frames("enemy/animation/idle.png",4),2,true);
-        animation.add("move",assets.frames("enemy/animation/move.png",4),3,true);
-        animation.play(speed == 0 ? "idle" : "move");
+        this.left = left;
+        this.right = right;
+        this.speed = speed * 0.75;
+        BufferedImage[] pictures = assets.snakeMove;
+        if (speed == 0) {
+            pictures = assets.snakeIdle;
+        }
+        // รูปงูใหญ่ขึ้น แต่กรอบชนยังเท่าเดิม
+        animation = new Animation(pictures, 0.25, true);
     }
-    @Override public void update(double dt) {
-        setX(getX() + direction * speed * dt);
-        if (getX() < left) { setX(left); direction = 1; }
-        if (getX() + getWidth() > right) { setX(right - getWidth()); direction = -1; }
-        animation.play(speed == 0 ? "idle" : "move");
+
+    @Override
+    public void update(double dt) {
         animation.update(dt);
+        x = x + direction * speed * dt;
+        if (x < left) {
+            x = left;
+            direction = 1;
+        }
+        if (x + width > right) {
+            x = right - width;
+            direction = -1;
+        }
     }
-    @Override public void draw(java.awt.Graphics2D g) {
-        java.awt.image.BufferedImage frame = animation.getCurrentFrame();
-        java.awt.geom.AffineTransform transform = g.getTransform();
-        double scaleX = Math.hypot(transform.getScaleX(),transform.getShearY());
-        double scaleY = Math.hypot(transform.getShearX(),transform.getScaleY());
-        if (scaleX == 0 || scaleY == 0) return;
-        // Preserve the source aspect ratio on screen, including the world's 800x600 -> 1280x720 scaling.
-        double height = getHeight() * 1.5 * 1.10;
-        double width = height * frame.getWidth() / frame.getHeight() * scaleY / scaleX;
-        double x = getX() + (getWidth()-width)/2;
-        double y = getY() + getHeight()-height;
-        java.awt.geom.AffineTransform placement = new java.awt.geom.AffineTransform();
-        placement.translate(direction > 0 ? x+width : x,y);
-        placement.scale((direction > 0 ? -width : width)/frame.getWidth(),height/frame.getHeight());
-        g.drawImage(frame,placement,null);
+
+    @Override
+    public void draw(Graphics g) {
+        // รูปต้นฉบับหันซ้าย ถ้างูเดินขวาให้กลับด้านรูป
+        drawFrame(g, animation.getFrame(), direction > 0);
     }
-    public void checkCollision(Player player) { if (collidesWith(player)) player.takeDamage(); }
+
+    public void checkCollision(Player player) {
+        if (collidesWith(player)) {
+            player.takeDamage();
+        }
+    }
 }

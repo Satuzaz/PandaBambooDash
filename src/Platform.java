@@ -1,17 +1,23 @@
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Graphics;
 
-public final class Platform extends Entity {
-    private final Color color;
+public class Platform extends Entity {
+    private Color color;
+
     public Platform(int x, int y, int width, int height, Color color) {
-        super(x, y, width, height, null); this.color = color;
+        super(x, y, width, height, null);
+        this.color = color;
     }
-    @Override public void update(double dt) { }
-    @Override public void draw(Graphics2D g) {
+
+@Override
+    public void draw(Graphics g) {
+        int x = GamePanel.screenX(getX());
+        int y = GamePanel.screenY(getY());
+        int width = GamePanel.screenX(getWidth());
+        int height = GamePanel.screenY(getHeight());
         g.setColor(new Color(24, 32, 31));
-        g.fillRoundRect((int)getX(), (int)getY(), getWidth(), getHeight(), 8, 8);
+        g.fillRect(x, y, width, height);
         g.setColor(color);
-        g.fillRoundRect((int)getX(), (int)getY(), getWidth(), 9, 8, 8);
-        g.setColor(new Color(255, 255, 255, 35));
-        g.drawLine((int)getX()+5, (int)getY()+2, (int)getX()+getWidth()-5, (int)getY()+2);
+        g.fillRect(x, y, width, GamePanel.screenY(9));
     }
 }
