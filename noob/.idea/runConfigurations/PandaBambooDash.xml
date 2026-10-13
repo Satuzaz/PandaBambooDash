@@ -1,8 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Panda Bamboo Dash" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="Main" />
-    <module name="PandaBambooDash" />
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-    <method v="2"><option name="Make" enabled="true" /></method>
-  </configuration>
-</component>
