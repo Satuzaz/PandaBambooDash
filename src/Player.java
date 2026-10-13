@@ -1,20 +1,23 @@
 import java.awt.Graphics;
 import java.util.ArrayList;
 
-
 public class Player extends Entity {
     private double velocityX;
     private double velocityY;
-    private double speed = 245;
     public static final int MAX_HEARTS = 4;
+    private static final double WALK_SPEED = 245;     // ความเร็วเดิน (หน่วยต่อวินาที)
+    private static final double JUMP_SPEED = 610;     // ความเร็วตอนเริ่มกระโดด
+    private static final double GRAVITY = 1600;       // แรงโน้มถ่วง ดึงลงทุกวินาที
+    private static final double MAX_FALL_SPEED = 900; // ตกเร็วสุดได้เท่านี้
+    private static final double DAMAGE_COOLDOWN = 1.4; // เวลาที่ไม่เสียหัวใจซ้ำหลังโดนชน (วินาที)
     private int hearts = MAX_HEARTS;
-    private Animation idle;
-    private Animation walk;
-    private Animation jump;
-    private Animation animation;
+    private Animation idleAnimation;
+    private Animation walkAnimation;
+    private Animation jumpAnimation;
+    private Animation currentAnimation;
     private boolean facingLeft;
-    private int bamboo;
-    private boolean grounded;
+    private int bambooCount;
+    private boolean onGround;
     private double damageCooldown;
     private double blinkTimer;
     private boolean hidden;
@@ -22,45 +25,45 @@ public class Player extends Entity {
 
     public Player(Assets assets) {
         super(40, 482, 40, 48, null);
-        idle = new Animation(assets.pandaIdle, 0.20, true);
-        walk = new Animation(assets.pandaWalk, 0.12, true);
-        jump = new Animation(assets.pandaJump, 0.12, false);
-        animation = idle;
+        idleAnimation = new Animation(assets.pandaIdle, 0.20, true);
+        walkAnimation = new Animation(assets.pandaWalk, 0.12, true);
+        jumpAnimation = new Animation(assets.pandaJump, 0.12, false);
+        currentAnimation = idleAnimation;
     }
 
     public int getHearts() {
         return hearts;
     }
 
-    public int getBamboo() {
-        return bamboo;
+    public int getBambooCount() {
+        return bambooCount;
     }
 
-    public boolean isGrounded() {
-        return grounded;
+    public boolean isOnGround() {
+        return onGround;
     }
 
     public void move(int direction) {
-        velocityX = direction * speed;
+        velocityX = direction * WALK_SPEED;
         if (direction != 0) {
             facingLeft = direction < 0;
         }
     }
 
     public void jump() {
-        if (grounded) {
-            velocityY = -610;
-            grounded = false;
+        if (onGround) {
+            velocityY = -JUMP_SPEED; // ค่าลบ = ขึ้น เพราะแกน y ของจอชี้ลง
+            onGround = false;
         }
     }
 
     public void collectBamboo() {
-        bamboo++;
+        bambooCount++;
     }
 
     public void enterLevel(Level level) {
         platforms = level.getPlatforms();
-        bamboo = 0;
+        bambooCount = 0;
         respawn();
     }
 
@@ -69,13 +72,13 @@ public class Player extends Entity {
         y = 482;
         velocityX = 0;
         velocityY = 0;
-        grounded = false;
+        onGround = false;
     }
 
     public void takeDamage() {
         if (damageCooldown <= 0 && hearts > 0) {
             hearts--;
-            damageCooldown = 1.4;
+            damageCooldown = DAMAGE_COOLDOWN;
             blinkTimer = 0;
             hidden = false;
         }
@@ -110,43 +113,46 @@ public class Player extends Entity {
         if (x < 0) {
             x = 0;
         }
+        // โลกของเกมกว้าง 800 สูง 600 ห้ามเดินออกนอกขอบซ้ายขวา
         if (x + width > 800) {
             x = 800 - width;
         }
 
         // เพิ่มแรงตก แล้วตรวจว่าลงบนพื้นหรือชนเพดาน
-        velocityY = velocityY + 1600 * dt;
-        if (velocityY > 900) {
-            velocityY = 900;
+        velocityY = velocityY + GRAVITY * dt;
+        if (velocityY > MAX_FALL_SPEED) {
+            velocityY = MAX_FALL_SPEED;
         }
         y = y + velocityY * dt;
-        grounded = false;
+        onGround = false;
         for (Platform platform : platforms) {
             if (collidesWith(platform)) {
                 if (velocityY > 0) {
                     y = platform.getY() - height;
-                    grounded = true;
+                    onGround = true;
                 } else if (velocityY < 0) {
                     y = platform.getY() + platform.getHeight();
                 }
                 velocityY = 0;
             }
         }
+        // ตกลงไปต่ำกว่าขอบล่างของจอ = ตกหลุม
         if (y > 600) {
             takeDamage();
             respawn();
         }
-        Animation next = idle;
-        if (!grounded) {
-            next = jump;
+        // เลือกท่า: ลอยอยู่ = กระโดด, เดินอยู่ = เดิน, นอกนั้น = ยืน
+        Animation nextAnimation = idleAnimation;
+        if (!onGround) {
+            nextAnimation = jumpAnimation;
         } else if (velocityX != 0) {
-            next = walk;
+            nextAnimation = walkAnimation;
         }
-        if (animation != next) {
-            animation = next;
-            animation.reset();
+        if (currentAnimation != nextAnimation) {
+            currentAnimation = nextAnimation;
+            currentAnimation.reset();
         }
-        animation.update(dt);
+        currentAnimation.update(dt);
     }
 
     @Override
@@ -155,6 +161,6 @@ public class Player extends Entity {
         if (hidden) {
             return;
         }
-        drawFrame(g, animation.getFrame(), facingLeft);
+        drawFrame(g, currentAnimation.getFrame(), facingLeft);
     }
 }

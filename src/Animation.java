@@ -21,7 +21,7 @@ public class Animation {
 
     public void update(double seconds) {
         timer = timer + seconds;
-        while (timer >= secondsPerPicture) {
+        if (timer >= secondsPerPicture) {
             timer = timer - secondsPerPicture;
             if (pictureNumber < pictures.length - 1) {
                 pictureNumber++;

@@ -3,17 +3,16 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.IOException;
 
-public class GamePanel extends JPanel implements ActionListener, KeyListener, MouseListener, FocusListener {
+public class GamePanel extends JPanel implements ActionListener, KeyListener, MouseListener {
     public static final int SCREEN_WIDTH = 1280;
     public static final int SCREEN_HEIGHT = 720;
     private Assets assets;
     private UIManager ui;
-    private Timer timer;
-    private boolean[] keys = new boolean[256];
-    private boolean left;
-    private boolean right;
-    private boolean spaceHeld;
-    private boolean jumpRequested;
+    private Timer gameTimer;
+    private boolean leftPressed;
+    private boolean rightPressed;
+    private boolean jumpHeld;      // ปุ่มกระโดดยังกดค้างอยู่หรือไม่
+    private boolean jumpRequested; // กดกระโดดแล้ว รอให้เกมสั่งแพนด้ากระโดด
     private GameState state = GameState.MENU;
     private Player player;
     private Level level;
@@ -36,8 +35,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener, Mo
         setFocusable(true);
         addKeyListener(this);
         addMouseListener(this);
-        addFocusListener(this);
-        timer = new Timer(16, this);
+        gameTimer = new Timer(16, this);
     }
 
     // Timer เรียกเมธอดนี้ทุก 16 มิลลิวินาที
@@ -47,29 +45,36 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener, Mo
         repaint();
     }
 
-    // ใช้รหัสปุ่มเป็นช่องในอาร์เรย์ true = กดอยู่, false = ปล่อยแล้ว
-    private void setKey(int code, boolean pressed) {
-        if (code < 0 || code >= keys.length) {
-            return;
-        }
-        keys[code] = pressed;
-        left = keys[KeyEvent.VK_LEFT] || keys[KeyEvent.VK_A];
-        right = keys[KeyEvent.VK_RIGHT] || keys[KeyEvent.VK_D];
-        boolean jumping = keys[KeyEvent.VK_SPACE] || keys[KeyEvent.VK_UP] || keys[KeyEvent.VK_W];
-        if (jumping && !spaceHeld) {
-            jumpRequested = true;
-        }
-        spaceHeld = jumping;
-    }
-
     @Override
     public void keyPressed(KeyEvent e) {
-        setKey(e.getKeyCode(), true);
+        int code = e.getKeyCode();
+        if (code == KeyEvent.VK_LEFT || code == KeyEvent.VK_A) {
+            leftPressed = true;
+        }
+        if (code == KeyEvent.VK_RIGHT || code == KeyEvent.VK_D) {
+            rightPressed = true;
+        }
+        if (code == KeyEvent.VK_SPACE || code == KeyEvent.VK_UP || code == KeyEvent.VK_W) {
+            // ถ้ากดค้างไว้จะไม่กระโดดซ้ำ ต้องปล่อยปุ่มก่อนถึงจะกระโดดใหม่ได้
+            if (!jumpHeld) {
+                jumpRequested = true;
+            }
+            jumpHeld = true;
+        }
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
-        setKey(e.getKeyCode(), false);
+        int code = e.getKeyCode();
+        if (code == KeyEvent.VK_LEFT || code == KeyEvent.VK_A) {
+            leftPressed = false;
+        }
+        if (code == KeyEvent.VK_RIGHT || code == KeyEvent.VK_D) {
+            rightPressed = false;
+        }
+        if (code == KeyEvent.VK_SPACE || code == KeyEvent.VK_UP || code == KeyEvent.VK_W) {
+            jumpHeld = false;
+        }
     }
 
     @Override
@@ -80,63 +85,45 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener, Mo
         }
     }
 
-    @Override
-    public void focusLost(FocusEvent e) {
-        clearInput();
-    }
-
     // เมธอดที่ interface บังคับให้มี แต่เกมนี้ไม่ได้ใช้งาน
     public void keyTyped(KeyEvent e) { }
     public void mouseClicked(MouseEvent e) { }
     public void mouseReleased(MouseEvent e) { }
     public void mouseEntered(MouseEvent e) { }
     public void mouseExited(MouseEvent e) { }
-    public void focusGained(FocusEvent e) { }
 
     private void clearInput() {
-        for (int i = 0; i < keys.length; i++) {
-            keys[i] = false;
-        }
-        left = false;
-        right = false;
-        spaceHeld = false;
+        leftPressed = false;
+        rightPressed = false;
+        jumpHeld = false;
         jumpRequested = false;
     }
 
     public void start() {
-        if (timer.isRunning()) {
+        if (gameTimer.isRunning()) {
             return;
         }
         requestFocusInWindow();
-        timer.start();
-    }
-
-    @Override
-    public void removeNotify() {
-        timer.stop();
-        super.removeNotify();
+        gameTimer.start();
     }
 
     private void handleClick(Point point) {
         if (state == GameState.MENU) {
             if (showingHelp) {
-                if (UIManager.bounds("menu").contains(point)) {
+                if (UIManager.MENU_BUTTON.contains(point)) {
                     showingHelp = false;
                 }
-            } else if (UIManager.bounds("start").contains(point)) {
+            } else if (UIManager.START_BUTTON.contains(point)) {
                 newGame();
-            } else if (UIManager.bounds("help").contains(point)) {
+            } else if (UIManager.HELP_BUTTON.contains(point)) {
                 showingHelp = true;
-            } else if (UIManager.bounds("exit").contains(point)) {
-                Window window = SwingUtilities.getWindowAncestor(this);
-                if (window != null) {
-                    window.dispatchEvent(new WindowEvent(window, WindowEvent.WINDOW_CLOSING));
-                }
+            } else if (UIManager.EXIT_BUTTON.contains(point)) {
+                System.exit(0);
             }
         } else if (state != GameState.PLAYING) {
-            if (UIManager.bounds("retry").contains(point)) {
+            if (UIManager.RETRY_BUTTON.contains(point)) {
                 newGame();
-            } else if (UIManager.bounds("menu").contains(point)) {
+            } else if (UIManager.MENU_BUTTON.contains(point)) {
                 state = GameState.MENU;
                 clearInput();
             }
@@ -152,13 +139,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener, Mo
     }
 
     private void loadLevel(int number) {
-        if (number == 1) {
-            level = new Level1(assets);
-        } else if (number == 2) {
-            level = new Level2(assets);
-        } else {
-            level = new Level3(assets);
-        }
+        level = new Level(number, assets);
         player.enterLevel(level);
     }
 
@@ -168,10 +149,10 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener, Mo
             return;
         }
         int direction = 0;
-        if (left) {
+        if (leftPressed) {
             direction--;
         }
-        if (right) {
+        if (rightPressed) {
             direction++;
         }
         player.move(direction);
@@ -184,7 +165,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener, Mo
         if (player.getHearts() == 0) {
             state = GameState.GAMEOVER;
             clearInput();
-        } else if (player.getBamboo() == 5) {
+        } else if (player.getBambooCount() == 5) {
             if (level.getNumber() == 3) {
                 state = GameState.WIN;
                 clearInput();

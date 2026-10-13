@@ -13,11 +13,7 @@ public class Entity {
         this.y = y;
         this.width = width;
         this.height = height;
-        if (image == null) {
-            this.image = null;
-        } else {
-            this.image = Assets.fit(image, GamePanel.screenX(width), GamePanel.screenY(height));
-        }
+        this.image = image;
     }
 
     public double getX() {
@@ -36,16 +32,14 @@ public class Entity {
         return height;
     }
 
-protected void setY(double y) {
-        this.y = y;
-    }
-
     // สี่เหลี่ยมชนกันเมื่อขอบของทั้งสองรูปซ้อนกันทั้งแนวนอนและแนวตั้ง
     public boolean collidesWith(Entity other) {
         return x < other.x + other.width && x + width > other.x
                 && y < other.y + other.height && y + height > other.y;
     }
 
+    // dt (delta time) = เวลาที่ผ่านไปตั้งแต่เฟรมก่อน หน่วยเป็นวินาที (เกมนี้ใช้ 0.016)
+    // ระยะที่เคลื่อนที่ = ความเร็ว x dt
     public void update(double dt) {
         // คลาสลูกที่เคลื่อนที่ได้จะเขียน update ของตัวเอง
     }
